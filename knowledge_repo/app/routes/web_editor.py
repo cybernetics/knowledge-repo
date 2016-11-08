@@ -46,9 +46,7 @@ def generate_users_typeahead():
 @blueprint.route('/ajax_paths_typeahead', methods=['GET'])
 def generate_projects_typeahead():
     # return path stubs for all repositories
-    stubs = []
-    for prefix in current_repo.uri.keys():
-        stubs.extend(['/'.join(p.split('/')[:-1]) for p in current_repo.uri[prefix].dir()])
+    stubs = ['/'.join(p.split('/')[:-1]) for p in current_repo.dir()]
     return json.dumps(list(set(stubs)))
 
 
@@ -76,14 +74,9 @@ def post_editor():
         or if the post already exists, with what has been saved """
     path = request.args.get('path', None)
 
-    repositories = None
-    if isinstance(current_repo.uri, dict):  # multiple repositories
-        repositories = current_repo.uri.keys()
-
     # set defaults
     data = {'title': None,
             'status': current_repo.PostStatus.DRAFT.value,
-            'repositories': repositories,
             'markdown': None,
             'comments': None,
             'thumbnail': '',
@@ -91,13 +84,15 @@ def post_editor():
             'username': g.user.username,
             'created_at': datetime.now(),
             'updated_at': datetime.now(),
+            'authors': [g.user.username],
             'comments': []}
 
     if path is not None and path in current_repo:
         kp = current_repo.post(path)
+        data.update(kp.headers)
+
         data['status'] = kp.status.value
-        headers = kp.headers
-        data.update(headers)
+        data['path'] = path
         data['markdown'] = kp.read(images=False, headers=False)
 
         # retrieve reviews
@@ -127,8 +122,6 @@ def save_post():
 
     data = request.get_json()
     path = data['path']
-    if data.get('repo', None):
-        path = os.path.join(data['repo'], path)
 
     # TODO better handling of overwriting
     kp = None
@@ -154,7 +147,7 @@ def save_post():
     kp.write(urlunquote(str(data['markdown'])), headers=headers)
 
     # add to repo
-    current_repo.add(kp, update=True)  # THIS IS DANGEROUS
+    current_repo.add(kp, update=True, message=headers['title'])  # THIS IS DANGEROUS
 
     return json.dumps({'path': path})
 

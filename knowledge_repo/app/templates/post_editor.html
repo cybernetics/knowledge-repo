@@ -124,19 +124,6 @@
             </select>
             <br>
 
-            {% if repositories %}
-            <label for="post_repo"> Repo </label>
-            <select id="post_repo"
-                    class="js-example-tags form-control"
-                    type="text"
-                    data-tags='true'>
-              {% for repo in repositories %}
-              <option value='{{ repo }}'> {{ repo }} </option>
-              {% endfor %}
-            </select>
-            {% endif %}
-            <br>
-
             <br>
 
             <label for="post_path"> Path </label>
@@ -293,9 +280,6 @@
 var all_form_fields = ['#post_title', '#post_path',
                        '#post_created_at', '#post_updated_at',
                        '#post_author', '#post_image_feed', '#post_tags']
-{% if repositories %}
-all_form_fields.push('#post_repo')
-{% endif %}
 
 // This will ensure that when you
 $.each(all_form_fields, function(i, v){
@@ -582,7 +566,6 @@ $(save_button).on("click", function(){
   var error = false;
   var title = $("#post_title")[0].value;
   var path = $('#post_path').typeahead('val');
-  var repo = $('#post_repo')[0].value
 
 
   // Currently, the tags from the post_tags are in a list
@@ -641,7 +624,6 @@ $(save_button).on("click", function(){
 
     postContent = {
       'title': title,
-      'repo': repo,
       'path': path,
       'feed_image': feed_image,
       'tags': tags,
