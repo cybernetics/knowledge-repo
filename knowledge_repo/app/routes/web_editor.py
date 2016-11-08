@@ -16,6 +16,7 @@ from ..models import Post, PostAuthorAssoc, Tag, Comment, User, PageView
 from ..utils.emails import send_review_email, send_reviewer_request_email
 from ..utils.image import pdf_page_to_png, is_pdf, is_allowed_image_format
 
+from ..index import update_index
 
 if sys.version_info.major > 2:
     from urllib.parse import unquote as urlunquote
@@ -73,7 +74,6 @@ def post_editor():
     """ Render the web post editor, either with the default values
         or if the post already exists, with what has been saved """
     path = request.args.get('path', None)
-
     # set defaults
     data = {'title': None,
             'status': current_repo.PostStatus.DRAFT.value,
@@ -134,21 +134,22 @@ def save_post():
     kp = kp or KnowledgePost(path=path)
 
     headers = {}
-    headers['created_at'] = datetime.strptime(data['created_at'], '%Y-%m-%d')
-    headers['updated_at'] = datetime.strptime(data['updated_at'], '%Y-%m-%d')
-    headers['title'] = str(data['title'])
-    headers['path'] = str(data['path'])
+    headers['created_at'] = datetime.strptime(data['created_at'], '%Y-%m-%d').date()
+    headers['updated_at'] = datetime.strptime(data['updated_at'], '%Y-%m-%d').date()
+    headers['title'] = data['title']
+    headers['path'] = data['path']
     # TODO: thumbnail header not working currently, as feed image set with kp
     # method not based on header
-    headers['thumbnail'] = str(data.get('feed_image', ''))
-    headers['authors'] = [str(auth).strip() for auth in data['author']]
-    headers['tldr'] = str(data['tldr'])
-    headers['tags'] = [str(tag).strip() for tag in data.get('tags', [])]
-    kp.write(urlunquote(str(data['markdown'])), headers=headers)
+    headers['thumbnail'] = data.get('feed_image', '')
+    headers['authors'] = [auth.strip() for auth in data['author']]
+    headers['tldr'] = data['tldr']
+    headers['tags'] = [tag.strip() for tag in data.get('tags', [])]
+    kp.write(urlunquote(data['markdown']), headers=headers)
 
     # add to repo
     current_repo.add(kp, update=True, message=headers['title'])  # THIS IS DANGEROUS
 
+    update_index()
     return json.dumps({'path': path})
 
 
@@ -165,6 +166,8 @@ def submit_for_review():
     if reviewers:
         for r in reviewers.split(','):
             send_reviewer_request_email(path=path, reviewer=r)
+
+    update_index()
     return 'OK'
 
 
@@ -176,6 +179,8 @@ def publish_post():
     if path not in current_repo:
         return json.dumps({'msg': "Unable to retrieve post with path = {}!".format(path), 'success': False})
     current_repo.publish(path)
+
+    update_index()
     return 'OK'
 
 
@@ -187,6 +192,8 @@ def unpublish_post():
     if path not in current_repo:
         return json.dumps({'msg': "Unable to retrieve post with path = {}!".format(path), 'success': False})
     current_repo.unpublish(path)
+
+    update_index()
     return 'OK'
 
 
@@ -198,6 +205,7 @@ def accept():
     if path not in current_repo:
         return json.dumps({'msg': "Unable to retrieve post with path = {}!".format(path), 'success': False})
     current_repo.accept(path)
+    update_index()
     return 'OK'
 
 
@@ -212,6 +220,8 @@ def delete_post():
     if g.user.username not in kp.headers['authors']:
         return json.dumps({'msg': "You can only delete a post where you are an author!", 'success': False})
     current_repo.remove(path)
+
+    update_index()
     return 'OK'
 
 
